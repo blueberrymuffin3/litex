@@ -152,6 +152,20 @@ static uint32_t get_uint32(unsigned char* data)
 
 #define MAX_FAILURES 256
 
+static void read_nibble(int *i, int *half, unsigned char *target) {
+	char hex = uart_read();
+	char nibble = hex >= 'A' ? hex - 'A' + 0x0A : hex - '0';
+
+	if (*half) {
+		*target |= nibble;
+		*half = 0;
+		(*i)++;
+	} else {
+		*target = nibble << 4;
+		*half = 1;
+	}
+}
+
 /* Returns 1 if other boot methods should be tried */
 int serialboot(void)
 {
@@ -184,30 +198,31 @@ int serialboot(void)
 	failures = 0;
 	while(1) {
 		int i;
+		int half;
 		int timeout;
 		int computed_crc;
 		int received_crc;
 
 		/* Get one Frame */
 		i = 0;
+		half = 0;
 		timeout = 1;
 		while((i == 0) || timer0_value_read()) {
 			if (uart_read_nonblock()) {
 				if (i == 0) {
 					timer0_load(CMD_TIMEOUT_DELAY);
-					frame.payload_length = uart_read();
+					read_nibble(&i, &half, &frame.payload_length);
 				}
-				if (i == 1) frame.crc[0] = uart_read();
-				if (i == 2) frame.crc[1] = uart_read();
-				if (i == 3) frame.cmd    = uart_read();
+				if (i == 1) read_nibble(&i, &half, &frame.crc[0]);
+				if (i == 2) read_nibble(&i, &half, &frame.crc[1]);
+				if (i == 3) read_nibble(&i, &half, &frame.cmd);
 				if (i >= 4) {
-					frame.payload[i-4] = uart_read();
-					if (i == (frame.payload_length + 4 - 1)) {
+					read_nibble(&i, &half, &frame.payload[i-4]);
+					if (i == (frame.payload_length + 4)) {
 						timeout = 0;
 						break;
 					}
 				}
-				i++;
 			}
 			timer0_update_value_write(1);
 		}

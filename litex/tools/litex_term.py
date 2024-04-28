@@ -281,8 +281,8 @@ crc16_table = [
 def crc16(l):
     crc = 0
     for d in l:
-        crc = crc16_table[((crc >> 8) ^ d) & 0xff] ^ (crc << 8)
-    return crc & 0xffff
+        crc = (crc16_table[((crc >> 8) ^ d) & 0xff] ^ (crc << 8)) & 0xffff
+    return crc
 
 # LiteXTerm ----------------------------------------------------------------------------------------
 
@@ -343,8 +343,9 @@ class LiteXTerm:
 
     def send_frame(self, frame):
         retry = 1
+        encoded_frame = frame.encode().hex().upper().encode()
         while retry:
-            self.port.write(frame.encode())
+            self.port.write(encoded_frame)
             # Get the reply from the device
             reply = self.port.read()
             if reply == sfl_ack_success:
@@ -390,7 +391,7 @@ class LiteXTerm:
                 frame_data    = bytearray(min(length, sfl_payload_length-4))
                 frame.payload = address.to_bytes(4, "big")
                 frame.payload += frame_data
-                frame = frame.encode()
+                frame = frame.encode().hex().upper().encode()
 
                 # Send N consecutive frames.
                 for i in range(nframes):
@@ -471,7 +472,8 @@ class LiteXTerm:
                 frame.payload += frame_data
 
                 # Encode frame and send it.
-                self.port.write(frame.encode())
+                encoded_frame = frame.encode().hex().upper().encode()
+                self.port.write(encoded_frame)
 
                 # Update parameters
                 current_address += len(frame_data)
